@@ -7,6 +7,7 @@ import { filterMap } from '../../../util/filter-map';
 import { HttpError } from '../../../util/http';
 import * as p from '../../../util/promises';
 import { newlineRegex, regEx } from '../../../util/regex';
+import { joinUrlParts } from '../../../util/url';
 import goVersioning from '../../versioning/go-mod-directive';
 import { Datasource } from '../datasource';
 import type { GetReleasesConfig, Release, ReleaseResult } from '../types';
@@ -129,7 +130,12 @@ export class GoProxyDatasource extends Datasource {
   }
 
   async listVersions(baseUrl: string, packageName: string): Promise<Release[]> {
-    const url = `${baseUrl}/${this.encodeCase(packageName)}/@v/list`;
+    const url = joinUrlParts(
+      baseUrl,
+      this.encodeCase(packageName),
+      '@v',
+      'list',
+    );
     const { body } = await this.http.get(url);
     return filterMap(body.split(newlineRegex), (str) => {
       if (!is.nonEmptyStringAndNotWhitespace(str)) {
@@ -152,7 +158,12 @@ export class GoProxyDatasource extends Datasource {
     packageName: string,
     version: string,
   ): Promise<Release> {
-    const url = `${baseUrl}/${this.encodeCase(packageName)}/@v/${version}.info`;
+    const url = joinUrlParts(
+      baseUrl,
+      this.encodeCase(packageName),
+      '@v',
+      `${version}.info`,
+    );
     const res = await this.http.getJson<VersionInfo>(url);
 
     const result: Release = {
@@ -171,7 +182,11 @@ export class GoProxyDatasource extends Datasource {
     packageName: string,
   ): Promise<string | null> {
     try {
-      const url = `${baseUrl}/${this.encodeCase(packageName)}/@latest`;
+      const url = joinUrlParts(
+        baseUrl,
+        this.encodeCase(packageName),
+        '@latest',
+      );
       const res = await this.http.getJson<VersionInfo>(url);
       return res.body.Version;
     } catch (err) {
@@ -198,9 +213,24 @@ export class GoProxyDatasource extends Datasource {
         major += 1; // v0 and v1 are the same module
       }
 
+      let releases: Release[] = [];
+
       try {
         const res = await this.listVersions(baseUrl, pkg);
-        const releases = await p.map(res, async (versionInfo) => {
+
+        // Artifactory returns all versions in any major (past and future),
+        // so starting from v2, we filter them in order to avoid the infinite loop
+        const filteredReleases = res.filter(({ version }) => {
+          if (major < 2) {
+            return true;
+          }
+
+          return (
+            version.split(regEx(/[^\d]+/)).find(is.truthy) === major.toString()
+          );
+        });
+
+        releases = await p.map(filteredReleases, async (versionInfo) => {
           const { version, newDigest, releaseTimestamp } = versionInfo;
 
           if (releaseTimestamp) {
@@ -242,6 +272,10 @@ export class GoProxyDatasource extends Datasource {
             result.releases.push(releaseFromLatest);
           }
         }
+      }
+
+      if (!releases.length) {
+        break;
       }
     }
 

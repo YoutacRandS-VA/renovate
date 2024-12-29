@@ -239,6 +239,7 @@ export interface RenovateConfig
   baseBranch?: string;
   defaultBranch?: string;
   branchList?: string[];
+  cloneSubmodulesFilter?: string[];
   description?: string | string[];
   force?: RenovateConfig;
   errors?: ValidationMessage[];
@@ -305,6 +306,9 @@ export interface RenovateConfig
   statusCheckNames?: Record<StatusCheckKey, string | null>;
   env?: UserEnv;
   logLevelRemap?: LogLevelRemap[];
+
+  branchTopic?: string;
+  additionalBranchPrefix?: string;
 }
 
 const CustomDatasourceFormats = ['json', 'plain', 'yaml', 'html'] as const;
@@ -381,6 +385,7 @@ export interface PackageRule
   matchRepositories?: string[];
   matchSourceUrls?: string[];
   matchUpdateTypes?: UpdateType[];
+  matchJsonata?: string[];
   registryUrls?: string[] | null;
   vulnerabilitySeverity?: string;
   vulnerabilityFixVersion?: string;
@@ -547,6 +552,7 @@ export interface PackageRuleInputConfig extends Record<string, unknown> {
   packageRules?: (PackageRule & PackageRuleInputConfig)[];
   releaseTimestamp?: string | null;
   repository?: string;
+  currentVersionAgeInDays?: number;
   currentVersionTimestamp?: string;
   enabled?: boolean;
   skipReason?: SkipReason;

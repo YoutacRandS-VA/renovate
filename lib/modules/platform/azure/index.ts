@@ -193,6 +193,7 @@ export async function getJsonFile(
 export async function initRepo({
   repository,
   cloneSubmodules,
+  cloneSubmodulesFilter,
 }: RepoParams): Promise<RepoResult> {
   logger.debug(`initRepo("${repository}")`);
   config = { repository } as Config;
@@ -240,6 +241,7 @@ export async function initRepo({
     url,
     extraCloneOpts: getStorageExtraCloneOpts(opts),
     cloneSubmodules,
+    cloneSubmodulesFilter,
   });
   const repoConfig: RepoResult = {
     defaultBranch,
@@ -538,7 +540,12 @@ export async function createPr({
       ),
     ),
   );
-  return getRenovatePRFormat(pr);
+
+  const result = getRenovatePRFormat(pr);
+  if (config.prList) {
+    config.prList.push(result);
+  }
+  return result;
 }
 
 export async function updatePr({
@@ -591,7 +598,27 @@ export async function updatePr({
     );
   }
 
-  await azureApiGit.updatePullRequest(objToUpdate, config.repoId, prNo);
+  const updatedPr = await azureApiGit.updatePullRequest(
+    objToUpdate,
+    config.repoId,
+    prNo,
+  );
+  if (config.prList) {
+    const prToCache = getRenovatePRFormat(updatedPr);
+    // We need to update the cached entry for this PR
+    const existingIndex = config.prList.findIndex(
+      (item) => item.number === prNo,
+    );
+    // istanbul ignore if: should not happen
+    if (existingIndex === -1) {
+      logger.warn({ prNo }, 'PR not found in cache');
+      // Add to cache
+      config.prList.push(prToCache);
+    } else {
+      // overwrite existing PR in cache
+      config.prList[existingIndex] = prToCache;
+    }
+  }
 }
 
 export async function ensureComment({

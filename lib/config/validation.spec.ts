@@ -4,22 +4,6 @@ import type { RenovateConfig } from './types';
 import * as configValidation from './validation';
 
 describe('config/validation', () => {
-  describe('getParentName()', () => {
-    it('ignores encrypted in root', () => {
-      expect(configValidation.getParentName('encrypted')).toBeEmptyString();
-    });
-
-    it('handles array types', () => {
-      expect(configValidation.getParentName('hostRules[1]')).toBe('hostRules');
-    });
-
-    it('handles encrypted within array types', () => {
-      expect(configValidation.getParentName('hostRules[0].encrypted')).toBe(
-        'hostRules',
-      );
-    });
-  });
-
   describe('validateConfig(config)', () => {
     it('returns deprecation warnings', async () => {
       const config = {
@@ -127,6 +111,20 @@ describe('config/validation', () => {
       const { errors } = await configValidation.validateConfig('repo', config);
       expect(errors).toHaveLength(1);
       expect(errors).toMatchSnapshot();
+    });
+
+    it('catches invalid jsonata expressions', async () => {
+      const config = {
+        packageRules: [
+          {
+            matchJsonata: ['packageName = "foo"', '{{{something wrong}'],
+            enabled: true,
+          },
+        ],
+      };
+      const { errors } = await configValidation.validateConfig('repo', config);
+      expect(errors).toHaveLength(1);
+      expect(errors[0].message).toContain('Invalid JSONata expression');
     });
 
     it('catches invalid allowedVersions regex', async () => {
@@ -305,6 +303,11 @@ describe('config/validation', () => {
             randomKey: '',
             defaultRegistryUrlTemplate: [],
             transformTemplates: [{}],
+          },
+          bar: {
+            description: 'foo',
+            defaultRegistryUrlTemplate: 'bar',
+            transformTemplates: ['foo = "bar"', 'bar[0'],
           },
         },
       } as any;
