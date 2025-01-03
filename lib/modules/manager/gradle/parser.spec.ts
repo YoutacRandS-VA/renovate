@@ -2,7 +2,12 @@ import is from '@sindresorhus/is';
 import { codeBlock } from 'common-tags';
 import { Fixtures } from '../../../../test/fixtures';
 import { fs, logger } from '../../../../test/util';
-import { parseGradle, parseKotlinSource, parseProps } from './parser';
+import {
+  parseGradle,
+  parseJavaToolchainVersion,
+  parseKotlinSource,
+  parseProps,
+} from './parser';
 import { GRADLE_PLUGINS, REGISTRY_URLS } from './parser/common';
 
 jest.mock('../../../util/fs');
@@ -157,10 +162,15 @@ describe('modules/manager/gradle/parser', () => {
       it('map with interpolated dependency strings', () => {
         const input = codeBlock`
           def slfj4Version = "2.0.0"
+          def lifecycle_version = "2.5.1"
           libraries = [
             jcl: "org.slf4j:jcl-over-slf4j:\${slfj4Version}",
             releaseCoroutines: "org.jetbrains.kotlinx:kotlinx-coroutines-core:0.26.1-eap13"
             api: "org.slf4j:slf4j-api:$slfj4Version",
+            lifecycle: [
+                "androidx.lifecycle:lifecycle-runtime-ktx:$lifecycle_version",
+                "androidx.lifecycle:lifecycle-viewmodel-ktx:$lifecycle_version"
+            ]
           ]
           foo = [ group: "org.slf4j", name: "slf4j-ext", version: slfj4Version ]
         `;
@@ -181,6 +191,16 @@ describe('modules/manager/gradle/parser', () => {
             depName: 'org.slf4j:slf4j-api',
             groupName: 'slfj4Version',
             currentValue: '2.0.0',
+          },
+          {
+            depName: 'androidx.lifecycle:lifecycle-runtime-ktx',
+            groupName: 'lifecycle_version',
+            currentValue: '2.5.1',
+          },
+          {
+            depName: 'androidx.lifecycle:lifecycle-viewmodel-ktx',
+            groupName: 'lifecycle_version',
+            currentValue: '2.5.1',
           },
           {
             depName: 'org.slf4j:slf4j-ext',
@@ -1091,6 +1111,25 @@ describe('modules/manager/gradle/parser', () => {
           },
         ],
       });
+    });
+  });
+
+  describe('Java language version', () => {
+    it.each`
+      input                                                                            | output
+      ${'java { toolchain { languageVersion = JavaLanguageVersion.of(22) } }'}         | ${'22'}
+      ${'java { toolchain.languageVersion.set(JavaLanguageVersion.of(16)) }'}          | ${'16'}
+      ${'java.toolchain { languageVersion.set(JavaLanguageVersion.of(17)) }'}          | ${'17'}
+      ${'java.toolchain.languageVersion = JavaLanguageVersion.of(21)'}                 | ${'21'}
+      ${'kotlin { jvmToolchain { languageVersion = JavaLanguageVersion.of(17) } }'}    | ${'17'}
+      ${'kotlin { jvmToolchain { languageVersion.set(JavaLanguageVersion.of(17)) } }'} | ${'17'}
+      ${'kotlin.jvmToolchain { languageVersion.set(JavaLanguageVersion.of(8)) }'}      | ${'8'}
+      ${'kotlin { jvmToolchain(11) }'}                                                 | ${'11'}
+      ${'kotlin.jvmToolchain(16)'}                                                     | ${'16'}
+      ${'dependencies { implementation "com.google.protobuf:protobuf-java:2.17.0" }'}  | ${null}
+    `('$input', ({ input, output }) => {
+      const javaLanguageVersion = parseJavaToolchainVersion(input);
+      expect(javaLanguageVersion).toBe(output);
     });
   });
 });

@@ -47,7 +47,7 @@ export function resolveBaseUrl(baseUrl: string, input: string | URL): string {
   let pathname;
   try {
     ({ host, pathname } = new URL(inputString));
-  } catch (e) {
+  } catch {
     pathname = inputString;
   }
 
@@ -85,29 +85,30 @@ export function getQueryString(params: Record<string, any>): string {
   return usp.toString();
 }
 
-export function validateUrl(
-  url: string | null | undefined,
-  httpOnly = true,
-): boolean {
+export function isHttpUrl(url: unknown): boolean {
   if (!is.nonEmptyString(url)) {
     return false;
   }
   try {
     const { protocol } = new URL(url);
-    return httpOnly ? !!protocol.startsWith('http') : !!protocol;
-  } catch (err) {
+    return protocol === 'https:' || protocol === 'http:';
+  } catch {
     return false;
   }
 }
 
-export function parseUrl(url: string | undefined | null): URL | null {
+export function parseUrl(url: URL | string | undefined | null): URL | null {
   if (!url) {
     return null;
   }
 
+  if (url instanceof URL) {
+    return url;
+  }
+
   try {
     return new URL(url);
-  } catch (err) {
+  } catch {
     return null;
   }
 }
@@ -134,4 +135,17 @@ export function parseLinkHeader(
     return null;
   }
   return _parseLinkHeader(linkHeader);
+}
+
+/**
+ * prefix https:// to hosts with port or path
+ */
+export function massageHostUrl(url: string): string {
+  if (!url.includes('://') && url.includes('/')) {
+    return 'https://' + url;
+  } else if (!url.includes('://') && url.includes(':')) {
+    return 'https://' + url;
+  } else {
+    return url;
+  }
 }
