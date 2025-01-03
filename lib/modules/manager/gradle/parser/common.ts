@@ -1,4 +1,5 @@
-import { lexer, parser, query as q } from 'good-enough-parser';
+import type { lexer, parser } from 'good-enough-parser';
+import { query as q } from 'good-enough-parser';
 import { clone } from '../../../../util/clone';
 import { regEx } from '../../../../util/regex';
 import type {
@@ -312,3 +313,22 @@ export const qKotlinImport = q
     return ctx;
   })
   .handler(cleanupTempVars);
+
+// foo { bar { baz } }
+// foo.bar { baz }
+export const qDotOrBraceExpr = (
+  symValue: q.SymMatcherValue,
+  matcher: q.QueryBuilder<Ctx, parser.Node>,
+): q.QueryBuilder<Ctx, parser.Node> =>
+  q.sym<Ctx>(symValue).alt(
+    q.alt<Ctx>(
+      q.op<Ctx>('.').join(matcher),
+      q.tree({
+        type: 'wrapped-tree',
+        maxDepth: 1,
+        startsWith: '{',
+        endsWith: '}',
+        search: matcher,
+      }),
+    ),
+  );
