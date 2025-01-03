@@ -285,6 +285,59 @@ describe('modules/manager/github-actions/extract', () => {
       ]);
     });
 
+    it('maintains spaces between hash and comment', () => {
+      const yamlContent = `
+      jobs:
+        build:
+          steps:
+            # One space
+            - name: "test1"
+              uses: actions/setup-node@56337c425554a6be30cdef71bf441f15be286854 # tag=v3.1.1
+            - name: "test2"
+              uses: 'actions/setup-node@1f8c6b94b26d0feae1e387ca63ccbdc44d27b561' # tag=v3.1.1
+            - name: "test3"
+              uses: "actions/setup-node@1f8c6b94b26d0feae1e387ca63ccbdc44d27b561" # tag=v2.5.1
+
+            # Two space
+            - name: "test1"
+              uses: actions/setup-node@56337c425554a6be30cdef71bf441f15be286854  # tag=v3.1.1
+            - name: "test2"
+              uses: 'actions/setup-node@1f8c6b94b26d0feae1e387ca63ccbdc44d27b561'  # tag=v3.1.1
+            - name: "test3"
+              uses: "actions/setup-node@1f8c6b94b26d0feae1e387ca63ccbdc44d27b561"  # tag=v2.5.1
+"`;
+
+      const res = extractPackageFile(yamlContent, 'workflow.yml');
+      expect(res).toMatchObject({
+        deps: [
+          {
+            replaceString:
+              'actions/setup-node@56337c425554a6be30cdef71bf441f15be286854 # tag=v3.1.1',
+          },
+          {
+            replaceString:
+              "'actions/setup-node@1f8c6b94b26d0feae1e387ca63ccbdc44d27b561' # tag=v3.1.1",
+          },
+          {
+            replaceString:
+              '"actions/setup-node@1f8c6b94b26d0feae1e387ca63ccbdc44d27b561" # tag=v2.5.1',
+          },
+          {
+            replaceString:
+              'actions/setup-node@56337c425554a6be30cdef71bf441f15be286854  # tag=v3.1.1',
+          },
+          {
+            replaceString:
+              "'actions/setup-node@1f8c6b94b26d0feae1e387ca63ccbdc44d27b561'  # tag=v3.1.1",
+          },
+          {
+            replaceString:
+              '"actions/setup-node@1f8c6b94b26d0feae1e387ca63ccbdc44d27b561"  # tag=v2.5.1',
+          },
+        ],
+      });
+    });
+
     it('extracts tags in different formats', () => {
       const res = extractPackageFile(
         Fixtures.get('workflow_4.yml'),
@@ -371,7 +424,6 @@ describe('modules/manager/github-actions/extract', () => {
         {
           currentValue: '01aecc#v2.1.0',
           replaceString: 'actions/checkout@01aecc#v2.1.0',
-          skipReason: 'invalid-version',
         },
         {
           currentDigest: '689fcce700ae7ffc576f2b029b51b2ffb66d3abd',
@@ -404,6 +456,8 @@ describe('modules/manager/github-actions/extract', () => {
             'actions-runner-controller/execute-assert-arc-e2e@f1d7c52253b89f0beae60141f8465d9495cdc2cf # actions-runner-controller-0.23.5',
         },
       ]);
+
+      expect(res!.deps[14]).not.toHaveProperty('skipReason');
     });
 
     it('extracts actions with fqdn', () => {
